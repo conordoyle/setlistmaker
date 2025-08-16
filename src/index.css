@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* --- Print Styles --- */
+@media print {
+  /* Hide elements we don't want on the PDF */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Make elements that are 'hidden' by default (for the screen) visible for print */
+  .print-header,
+  .song-list-container,
+  .print-footer {
+    display: block !important;
+  }
+
+  /* Basic page and body setup */
+  @page {
+    margin: 0.25in 0.2in; 
+    size: auto;
+  }
+
+  body,
+  #root {
+    background-color: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Remove screen-only styles from the main container */
+  .printable-area {
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    height: 100vh !important; /* Fill entire viewport */
+  }
+
+  /* Hide the header completely for print */
+  .print-header {
+    display: none !important;
+  }
+
+  /* This creates the two-column layout that flows across pages */
+  .song-list-container {
+    /* --- SAFARI COMPATIBILITY FIXES --- */
+    -webkit-column-count: 2 !important;
+    -webkit-column-gap: 4rem !important;
+    -webkit-column-fill: balance !important;
+    display: block !important;
+    grid-template-columns: none !important;
+    grid-template-rows: none !important;
+    /* --- END OF SAFARI FIXES --- */
+
+    column-count: 2;
+    column-gap: 4rem;
+    column-fill: balance;
+    margin: 0 !important;
+    padding: 0 !important;
+
+    /* BETTER CENTERING */
+    width: 95%; /* CHANGED: Increased from 85% to fill more of the page */
+    max-width: 9in;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    text-align: left;
+    
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    
+    min-height: calc(100vh - 1in);
+  }
+
+  /* Styles for each song item in the print view */
+  .song-cell-print {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    padding: 6px 0;
+    margin-bottom: 6px;
+    font-size: 2.2rem;
+    font-weight: 900;
+    display: block !important;
+    line-height: 1.05;
+  }
+
+  .song-cell-print .song-number {
+    font-weight: normal; 
+    display: inline-block;
+    padding-right: 0.5rem; 
+    font-size: 2.2rem;
+  }
+
+  .song-cell-print .song-title {
+    font-weight: 900;
+    font-size: 2.2rem;
+  }
+
+  /* Footer: Logo and text side-by-side at the very bottom */
+  .print-footer {
+    position: fixed;
+    bottom: 0.01in;
+    right: 0.01in;
+    width: auto;
+    display: flex !important;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 0.5rem;
+    padding: 0;
+    margin: 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    z-index: 1000;
+  }
+
+  .print-footer img {
+    height: 40px;
+    width: auto;
+  }
+
+  .print-footer p {
+    font-size: 0.85rem;
+    margin: 0;
+    text-align: left;
+    white-space: nowrap;
+    font-weight: normal;
+    margin-bottom: 2px;
+  }
+
+  /* Remove browser default headers/footers */
+  body::before,
+  body::after,
+  html::before,
+  html::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  html {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 100% !important;
+  }
+}
