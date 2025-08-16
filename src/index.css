@@ -35,7 +35,7 @@ body {
 
   /* Basic page and body setup */
   @page {
-    margin: 0.25in 0.2in; 
+    margin: 0.35in 0.3in; 
     size: auto;
   }
 
@@ -100,8 +100,8 @@ body {
     break-inside: avoid;
     page-break-inside: avoid;
     -webkit-column-break-inside: avoid;
-    padding: 6px 0;
-    margin-bottom: 6px;
+    padding: 5px 0;
+    margin-bottom: 5px;
     font-size: 2.2rem;
     font-weight: 900;
     display: block !important;
