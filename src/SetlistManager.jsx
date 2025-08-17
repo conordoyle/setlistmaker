@@ -440,31 +440,30 @@ export default function SetlistManager() {
 
   const handleDragEnd = useCallback(async (event) => {
     const { active, over } = event;
-    if (over && active.id !== over.id && currentSetlist) {
+    if (over && active.id !== over.id) {
       const oldIndex = songs.findIndex((s) => s.id === active.id);
       const newIndex = songs.findIndex((s) => s.id === over.id);
-      const originalSongs = [...songs];
-
-      // Optimistic UI update for instant feedback
       const newSongs = arrayMove(songs, oldIndex, newIndex);
+      
+      // Optimistic UI update - immediately show the new order
       setSongs(newSongs);
-
+      
+      // Update positions
       const songsWithPositions = newSongs.map((song, index) => ({
         id: song.id,
-        position: index,
+        position: index
       }));
-
+      
       try {
         await fetch(`${API_BASE_URL}/api/setlists/${currentSetlist.id}/songs/reorder`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ songs: songsWithPositions }),
+          body: JSON.stringify({ songs: songsWithPositions })
         });
       } catch (error) {
         console.error('Error reordering songs:', error);
-        // Revert on failure
-        setSongs(originalSongs);
-        alert('Failed to save the new song order. Please try again.');
+        // If the reorder fails, revert to the original order
+        setSongs(songs);
       }
     }
     setActiveId(null);
@@ -489,16 +488,36 @@ export default function SetlistManager() {
 
   const addSong = useCallback(async () => {
     if (!currentSetlist) return;
+    
+    // Create a temporary song with a temporary ID for optimistic update
+    const tempSong = {
+      id: `temp-${Date.now()}`,
+      title: 'New Song',
+      position: songs.length,
+      setlist_id: currentSetlist.id
+    };
+    
+    // Optimistic UI update
+    setSongs(prev => [...prev, tempSong]);
+    
     try {
-      await fetch(`${API_BASE_URL}/api/setlists/${currentSetlist.id}/songs`, {
+      const response = await fetch(`${API_BASE_URL}/api/setlists/${currentSetlist.id}/songs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'New Song' }),
+        body: JSON.stringify({ title: 'New Song' })
       });
+      
+      if (response.ok) {
+        const newSong = await response.json();
+        // Replace the temporary song with the real one from the backend
+        setSongs(prev => prev.map(s => s.id === tempSong.id ? newSong : s));
+      }
     } catch (error) {
       console.error('Error adding song:', error);
+      // If the add fails, remove the temporary song
+      setSongs(prev => prev.filter(s => s.id !== tempSong.id));
     }
-  }, [currentSetlist]);
+  }, [currentSetlist, songs.length]);
 
   const deleteSong = useCallback(async (id) => {
     if (!currentSetlist) return;
