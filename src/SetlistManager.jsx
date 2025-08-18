@@ -72,63 +72,25 @@ const SetlistDropdown = ({ setlists, currentSetlist, onSetlistChange, onCreateNe
     };
   }, [isOpen]);
 
-  const handleCreateBlank = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/setlists`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newSetlistTitle || 'New Setlist' })
-      });
-      
-      if (response.ok) {
-        const newSetlist = await response.json();
-        onCreateNew(newSetlist);
-        setNewSetlistTitle('');
-        setShowCreateOptions(false);
-        setIsOpen(false);
-      }
-    } catch (error) {
-      console.error('Error creating setlist:', error);
-    }
+  const handleCreateBlank = () => {
+    onCreateNew('blank', newSetlistTitle);
+    setNewSetlistTitle('');
+    setShowCreateOptions(false);
+    setIsOpen(false);
   };
 
-  const handleCopySetlist = async () => {
+  const handleCopySetlist = () => {
     if (!currentSetlist) return;
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/setlists/${currentSetlist.id}/copy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newSetlistTitle || `${currentSetlist.title} (Copy)` })
-      });
-      
-      if (response.ok) {
-        const newSetlist = await response.json();
-        onCreateNew(newSetlist);
-        setNewSetlistTitle('');
-        setShowCreateOptions(false);
-        setIsOpen(false);
-      }
-    } catch (error) {
-      console.error('Error copying setlist:', error);
-    }
+    onCreateNew('copy', newSetlistTitle);
+    setNewSetlistTitle('');
+    setShowCreateOptions(false);
+    setIsOpen(false);
   };
 
-  const handleRemoveSetlist = async () => {
+  const handleRemoveSetlist = () => {
     if (!currentSetlist || setlists.length <= 1) return;
-    
     if (window.confirm(`Are you sure you want to remove "${currentSetlist.title}"?`)) {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/setlists/${currentSetlist.id}`, {
-          method: 'DELETE'
-        });
-        
-        if (response.ok) {
-          onRemoveSetlist(currentSetlist.id);
-        }
-      } catch (error) {
-        console.error('Error removing setlist:', error);
-      }
+      onRemoveSetlist();
     }
   };
 
@@ -360,14 +322,71 @@ export default function SetlistManager() {
     }
   }, [currentSetlist?.id]);
 
+  // When the list of setlists changes, ensure currentSetlist is still valid
+  useEffect(() => {
+    if (currentSetlist && !setlists.some(s => s.id === currentSetlist.id)) {
+      // The current setlist was deleted, select the first available one
+      setCurrentSetlist(setlists[0] || null);
+    }
+  }, [setlists, currentSetlist]);
+
+  const handleCreateSetlist = useCallback(async (type, title) => {
+    try {
+      const endpoint = type === 'copy' && currentSetlist ? `${API_BASE_URL}/api/setlists/${currentSetlist.id}/copy` : `${API_BASE_URL}/api/setlists`;
+      const bodyTitle = title || (type === 'copy' && currentSetlist ? `${currentSetlist.title} (Copy)` : 'New Setlist');
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: bodyTitle }),
+      });
+
+      if (!response.ok) throw new Error('API request failed');
+
+      const newSetlist = await response.json();
+      // The socket event will add it to the list for everyone.
+      // We just need to set it as the current one for the user who created it.
+      setCurrentSetlist(newSetlist);
+    } catch (error) {
+      console.error(`Error creating setlist (type: ${type}):`, error);
+      alert('Failed to create setlist. Please try again.');
+    }
+  }, [currentSetlist]);
+
+  const handleRemoveCurrentSetlist = useCallback(async () => {
+    if (!currentSetlist || setlists.length <= 1) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/setlists/${currentSetlist.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('API request failed');
+      // On success, the socket event will handle the UI update for all clients.
+    } catch (error) {
+      console.error('Error removing setlist:', error);
+      alert('Failed to remove setlist. Please try again.');
+    }
+  }, [currentSetlist, setlists]);
+
   // Socket.io event listeners setup
   useEffect(() => {
     console.log('Setting up Socket.io listeners...');
-    socket.on('setlist:created', (newSetlist) => setSetlists(prev => [newSetlist, ...prev]));
+    socket.on('setlist:created', (newSetlist) => {
+      setSetlists(prev => {
+        // Prevent duplicates if the event is received multiple times
+        if (prev.some(s => s.id === newSetlist.id)) {
+          return prev;
+        }
+        return [newSetlist, ...prev];
+      });
+    });
+
     socket.on('setlist:updated', (updatedSetlist) => {
       setSetlists(prev => prev.map(s => s.id === updatedSetlist.id ? updatedSetlist : s));
       if (currentSetlist?.id === updatedSetlist.id) setCurrentSetlist(updatedSetlist);
     });
+
     socket.on('setlist:removed', ({ id }) => {
       if (localStorage.getItem('currentSetlistId') === id) {
         localStorage.removeItem('currentSetlistId');
@@ -375,15 +394,19 @@ export default function SetlistManager() {
       setSetlists(prev => prev.filter(s => s.id !== id));
       if (currentSetlist?.id === id) setCurrentSetlist(setlists.find(s => s.id !== id) || null);
     });
+
     socket.on('song:added', ({ setlistId, song }) => {
       if (currentSetlist?.id === setlistId) setSongs(prev => [...prev, song]);
     });
+
     socket.on('song:updated', ({ setlistId, song }) => {
       if (currentSetlist?.id === setlistId) setSongs(prev => prev.map(s => s.id === song.id ? song : s));
     });
+
     socket.on('song:deleted', ({ setlistId, songId }) => {
       if (currentSetlist?.id === setlistId) setSongs(prev => prev.filter(s => s.id !== songId));
     });
+
     socket.on('songs:reordered', ({ setlistId, songs: reorderedSongs }) => {
       if (currentSetlist?.id === setlistId) setSongs(reorderedSongs);
     });
@@ -398,14 +421,6 @@ export default function SetlistManager() {
       socket.off('songs:reordered');
     };
   }, []);
-
-  // When the list of setlists changes, ensure currentSetlist is still valid
-  useEffect(() => {
-    if (currentSetlist && !setlists.some(s => s.id === currentSetlist.id)) {
-      // The current setlist was deleted, select the first available one
-      setCurrentSetlist(setlists[0] || null);
-    }
-  }, [setlists, currentSetlist]);
 
   // Load songs when current setlist changes
   useEffect(() => {
@@ -690,12 +705,8 @@ export default function SetlistManager() {
             setlists={setlists}
             currentSetlist={currentSetlist}
             onSetlistChange={setCurrentSetlist}
-            onCreateNew={setCurrentSetlist}
-            onRemoveSetlist={() => {
-              // The actual removal is handled by the API call in the dropdown
-              // and the socket event handler. This prop is just to trigger it.
-              // No need to update state here directly.
-            }}
+            onCreateNew={handleCreateSetlist}
+            onRemoveSetlist={handleRemoveCurrentSetlist}
           />
         </header>
 
