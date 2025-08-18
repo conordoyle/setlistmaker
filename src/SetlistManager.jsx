@@ -519,6 +519,8 @@ export default function SetlistManager() {
     }
   }, [currentSetlist, songs.length]);
 
+  
+
   const deleteSong = useCallback(async (id) => {
     if (!currentSetlist) return;
 
@@ -563,6 +565,22 @@ export default function SetlistManager() {
   }, [currentSetlist, songs]);
 
   const exportToPdf = () => window.print();
+
+  const copyUrlForChrome = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      alert('✅ URL copied! Now paste it into Chrome for better printing.');
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = window.location.href;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      alert('✅ URL copied! Now paste it into Chrome for better printing.');
+    }
+  };
 
   const triggerLogoUpload = () => fileInputRef.current?.click();
 
@@ -749,7 +767,17 @@ export default function SetlistManager() {
             
             <div className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400 no-print">
               <p>💡 Drag any song to reorder your setlist. Songs will automatically renumber.</p>
-              {isSafari && (<p className="mt-2 text-amber-600 dark:text-amber-400 font-medium">⚠️ Safari users: For best print results, use Chrome or Firefox.</p>)}
+              {isSafari && (
+                <div className="mt-2 text-amber-600 dark:text-amber-400 font-medium">
+                  <p>⚠️ Safari users: For best print results, use Chrome or Firefox.</p>
+                  <button
+                    onClick={copyUrlForChrome}
+                    className="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    📋 Copy URL for Chrome
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ) : (
